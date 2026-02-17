@@ -1,0 +1,1 @@
+# AVD-Image-FBMScaleStage-CentralUS-WindowsServer2022
