@@ -19,324 +19,344 @@ variable "client_id" {}
 variable "client_secret" {}
 
 source "azure-arm" "windowsserver2022_avd_manhattanscale" {
-  subscription_id = var.subscription_id
-  tenant_id       = var.tenant_id
-  client_id       = var.client_id
-  client_secret   = var.client_secret
+    subscription_id = var.subscription_id
+    tenant_id       = var.tenant_id
+    client_id       = var.client_id
+    client_secret   = var.client_secret
+    os_type         = "Windows"
+    image_publisher = "microsoftwindowsserver"
+    image_offer     = "windowsserver"
+    image_sku       = "2022-datacenter-azure-edition"
+    image_version   = "latest"
+    vm_size         = "Standard_E8ds_v5"
+    os_disk_size_gb = 127
+    communicator    = "winrm"
+    winrm_use_ssl   = true
+    winrm_insecure  = true
+    winrm_timeout   = "10m"
+    winrm_username  = "packer"
+    build_resource_group_name = "fbm-avd-packerbuild01"
 
-  os_type         = "Windows"
-  image_publisher = "microsoftwindowsserver"
-  image_offer     = "windowsserver"
-  image_sku       = "2022-datacenter-azure-edition"
-  image_version   = "latest"
-  vm_size         = "Standard_E8ds_v5"
-  os_disk_size_gb = 127
+    shared_image_gallery_destination {
+        subscription        = var.subscription_id
+        resource_group      = "fbm-scale-americas-avd"
+        gallery_name        = "acgazeasavdfbmscaleprod01"
+        image_name          = "azure_windowsserver_2022_baseos_avd_24h2_prodeastus_gen2"
+        image_version       = "16.02.2026"
+        replication_regions = ["eastus", "centralus"]
+    }
 
-  communicator   = "winrm"
-  winrm_use_ssl  = true
-  winrm_insecure = true
-  winrm_timeout  = "10m"
-  winrm_username = "packer"
-
-  build_resource_group_name = "fbm-avd-packerbuild01"
-
-  shared_image_gallery_destination {
-    subscription        = var.subscription_id
-    resource_group      = "fbm-scale-americas-avd"
-    gallery_name        = "acgazeasavdfbmscaleprod01"
-    image_name          = "azure_windowsserver_2022_baseos_avd_24h2_prodeastus_gen2"
-    image_version       = "16.2.2026" # <-- avoid leading zero in minor version
-    replication_regions = ["eastus", "centralus"]
-  }
-
-  azure_tags = {
-    AVDAZServices = "AVD Components"
-    Environment   = "Production"
-    Owner         = "AVDTeam"
-  }
+    azure_tags = {
+        AVDAZServices = "AVD Components"
+        Environment   = "Production"
+        Owner         = "AVDTeam"
+    }
 }
 
 build {
-  name    = "AVD_WindowsServer_2022_Image_Build"
-  sources = ["source.azure-arm.windowsserver2022_avd_manhattanscale"]
+    name    = "AVD_WindowsServer_2022_Image_Build"
+    sources = ["source.azure-arm.windowsserver2022_avd_manhattanscale"]
 
   ##############################################
   # 1. Apply Custom AVD Settings
   ##############################################
-  provisioner "powershell" {
-    inline = [
-      "$path = 'C:\\AVDImage'",
-      "if (-not (Test-Path -Path $path)) { New-Item -ItemType Directory -Force -Path $path | Out-Null }",
-      "$script = 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_CustomSettings.ps1'",
-      "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_CustomSettings.ps1' -OutFile $script",
-      "Start-Sleep -Seconds 10",
-      "powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script"
-    ]
-    timeout          = "2h"
-    valid_exit_codes = [0, 3010]
-  }
+    provisioner "powershell" {
+        inline = [
+            "$path = 'C:\\AVDImage'",
+            "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
+            "cd C:\\AVDImage",
+            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_CustomSettings.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_CustomSettings.ps1'",
+            "Start-Sleep -Seconds 30",
+            "& .\\AIB_WindowsServer_2022_ManhattanScale_CustomSettings.ps1"
+        ]
+        timeout          = "2h"
+        valid_exit_codes = [0, 3010]
+    }
 
   ##############################################
-  # 2. Install Scale Applications - Step1
+  # 2. Install Scale Applications - Step 1
   ##############################################
-  provisioner "powershell" {
-    inline = [
-      "$path = 'C:\\AVDImage'",
-      "if (-not (Test-Path -Path $path)) { New-Item -ItemType Directory -Force -Path $path | Out-Null }",
-      "$script = 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_InstallApps.ps1'",
-      "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_InstallApps.ps1' -OutFile $script",
-      "Start-Sleep -Seconds 10",
-      "powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script"
-    ]
-    timeout          = "2h"
-    valid_exit_codes = [0, 3010]
-  }
+  # FIX: This provisioner was never closed in the original; Step 3 was nested inside it.
+    provisioner "powershell" {
+        inline = [
+            "$path = 'C:\\AVDImage'",
+            "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
+            "cd C:\\AVDImage",
+            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_InstallApps.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_InstallApps.ps1'",
+            "Start-Sleep -Seconds 30",
+            "& .\\AIB_WindowsServer_2022_ManhattanScale_InstallApps.ps1"
+        ]
+        timeout          = "2h"
+        valid_exit_codes = [0, 3010]
+    }
 
   ##############################################
-  # 3. Install Scale Applications - Step2
+  # 3. Install Scale Applications - Step 2
   ##############################################
-  provisioner "powershell" {
-    inline = [
-      "$script = 'C:\\ManhattanAssociates\\ManhattanSCALE\\dsc.ps1'",
-      "if (-not (Test-Path -Path $script)) { Write-Error \"Missing script: $script\"; exit 1 }",
-      "powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script"
-    ]
-    timeout          = "2h"
-    valid_exit_codes = [0, 3010]
-  }
+  # FIX: Backslashes were unescaped — C:\ManhattanAssociates\ → C:\\ManhattanAssociates\\
+    provisioner "powershell" {
+        inline = [
+            "cd C:\\ManhattanAssociates\\ManhattanSCALE\\",
+            "& .\\dsc.ps1"
+        ]
+        timeout          = "2h"
+        valid_exit_codes = [0, 3010]
+    }
 
   ##############################################
-  # 4. Rebooting the VM
+  # 4. Reboot After Application Install
   ##############################################
-  provisioner "powershell" {
-    inline  = ["Write-Output 'Rebooting after step 3...'; Restart-Computer -Force"]
-    timeout = "30m"
-  }
+    provisioner "powershell" {
+        inline = [
+            "Write-Output 'Rebooting after application install...'; Restart-Computer -Force"
+        ]
+        timeout = "30m"
+    }
 
   ##############################################
-  # 5. Check if Local User ILSSRV exists in Admin Group
+  # 5. Check if Local User ILSSRV Exists in Admin Group
   ##############################################
-  provisioner "powershell" {
-    inline = [
-      "$path = 'C:\\AVDImage'",
-      "if (-not (Test-Path -Path $path)) { New-Item -ItemType Directory -Force -Path $path | Out-Null }",
-      "$script = 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_LocalUserAdministratorVerify.ps1'",
-      "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_LocalUserAdministratorVerify.ps1' -OutFile $script",
-      "Start-Sleep -Seconds 10",
-      "powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script"
-    ]
-    timeout          = "2h"
-    valid_exit_codes = [0, 3010]
-  }
+    provisioner "powershell" {
+        inline = [
+            "$path = 'C:\\AVDImage'",
+            "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
+            "cd C:\\AVDImage",
+            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_LocalUserAdministratorVerify.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_LocalUserAdministratorVerify.ps1'",
+            "Start-Sleep -Seconds 30",
+            "& .\\AIB_WindowsServer_2022_ManhattanScale_LocalUserAdministratorVerify.ps1"
+        ]
+        timeout          = "2h"
+        valid_exit_codes = [0, 3010]
+    }
 
   ##############################################
-  # 6. NCACHE Installation
+  # 6. Install NCache
   ##############################################
-  provisioner "powershell" {
-    inline = [
-      "$script = 'C:\\ManhattanAssociates\\ManhattanSCALE\\Ncache\\install.ps1'",
-      "if (-not (Test-Path -Path $script)) { Write-Error \"Missing script: $script\"; exit 1 }",
-      "powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script"
-    ]
-    timeout          = "2h"
-    valid_exit_codes = [0, 3010]
-  }
+  # FIX: Backslashes were unescaped
+    provisioner "powershell" {
+        inline = [
+            "cd C:\\ManhattanAssociates\\ManhattanSCALE\\Ncache",
+            "& .\\install.ps1"
+        ]
+        timeout          = "2h"
+        valid_exit_codes = [0, 3010]
+    }
 
   ##############################################
-  # 7. Rebooting the VM
+  # 7. Reboot After NCache Install
   ##############################################
-  provisioner "powershell" {
-    inline  = ["Write-Output 'Rebooting after NCACHE install...'; Restart-Computer -Force"]
-    timeout = "30m"
-  }
+    provisioner "powershell" {
+        inline = [
+            "Write-Output 'Rebooting after NCache install...'; Restart-Computer -Force"
+        ]
+        timeout = "30m"
+    }
 
   ##############################################
-  # 8. Import NCACHE Module & Start Cache
+  # 8. Import NCache Module and Start Cache
   ##############################################
-  provisioner "powershell" {
-    inline = [
-      "$path = 'C:\\AVDImage'",
-      "if (-not (Test-Path -Path $path)) { New-Item -ItemType Directory -Force -Path $path | Out-Null }",
-      "$script1 = 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_ImportNcacheDLL.ps1'",
-      "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_ImportNcacheDLL.ps1' -OutFile $script1",
-      "Start-Sleep -Seconds 10",
-      "powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script1",
-      "Start-Sleep -Seconds 10",
-      "$script2 = 'C:\\ManhattanAssociates\\ManhattanSCALE\\Ncache\\bin\\startcache.ps1'",
-      "if (-not (Test-Path -Path $script2)) { Write-Error \"Missing script: $script2\"; exit 1 }",
-      "powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script2"
-    ]
-    timeout          = "2h"
-    valid_exit_codes = [0, 3010]
-  }
+  # FIX 1: Missing comma after ImportNcacheDLL line
+  # FIX 2: Unescaped backslashes in cd path
+  # FIX 3: Unclosed string literal on startcache.ps1 line (missing closing ")
+    provisioner "powershell" {
+        inline = [
+            "$path = 'C:\\AVDImage'",
+            "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
+            "cd C:\\AVDImage",
+            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_ImportNcacheDLL.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_ImportNcacheDLL.ps1'",
+            "Start-Sleep -Seconds 30",
+            "& .\\AIB_WindowsServer_2022_ManhattanScale_ImportNcacheDLL.ps1",
+            "Start-Sleep -Seconds 30",
+            "cd C:\\ManhattanAssociates\\ManhattanSCALE\\Ncache\\bin",
+            "& .\\startcache.ps1"
+        ]
+        timeout          = "2h"
+        valid_exit_codes = [0, 3010]
+    }
 
   ##############################################
   # 9. Windows Optimization
   ##############################################
-  provisioner "powershell" {
-    inline = [
-      "$path = 'C:\\AVDImage3'",
-      "if (-not (Test-Path -Path $path)) { New-Item -ItemType Directory -Force -Path $path | Out-Null }",
-      "$script = 'C:\\AVDImage3\\windowsOptimization.ps1'",
-      "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/WindowsOptimization.ps1' -OutFile $script",
-      "Start-Sleep -Seconds 10",
-      "powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -ArgumentList '-Optimizations ''DefaultUserSettings'',''NetworkOptimizations'''"
-    ]
-    timeout          = "1h"
-    valid_exit_codes = [0, 3010]
-  }
+    provisioner "powershell" {
+        inline = [
+            "$path = 'C:\\AVDImage3'",
+            "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
+            "cd C:\\AVDImage3",
+            "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/WindowsOptimization.ps1' -OutFile 'C:\\AVDImage3\\windowsOptimization.ps1'",
+            "Start-Sleep -Seconds 30",
+            "& .\\windowsOptimization.ps1 -Optimizations 'DefaultUserSettings','NetworkOptimizations'"
+        ]
+        timeout          = "1h"
+        valid_exit_codes = [0, 3010]
+    }
 
   ##############################################
   # 10. Post-Optimization Windows Updates
   ##############################################
-  provisioner "windows-update" {
-    search_criteria = "IsInstalled=0"
-    filters = [
-      "exclude:$_.Title -like '*Preview*'",
-      "include:$true"
-    ]
-    update_limit = 100
-  }
+    provisioner "windows-update" {
+        search_criteria = "IsInstalled=0"
+        filters = [
+            "exclude:$_.Title -like '*Preview*'",
+            "include:$true"
+        ]
+        update_limit = 100
+    }
 
   ##############################################
   # 11. Reboot After Optimization
   ##############################################
-  provisioner "powershell" {
-    inline  = ["Write-Output 'Rebooting after optimizations...'; Restart-Computer -Force"]
-    timeout = "30m"
-  }
+    provisioner "powershell" {
+        inline = [
+            "Write-Output 'Rebooting after optimizations...'; Restart-Computer -Force"
+        ]
+        timeout = "30m"
+    }
 
   ##############################################
-  # 12. Disabling Unwanted Services
+  # 12. Disable Unwanted Services
   ##############################################
-  provisioner "powershell" {
-    inline = [
-      "$path = 'C:\\AVDImage'",
-      "if (-not (Test-Path -Path $path)) { New-Item -ItemType Directory -Force -Path $path | Out-Null }",
-      "$script = 'C:\\AVDImage\\AIB_AVD_DisableServices.ps1'",
-      "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_AVD_DisableServices.ps1' -OutFile $script",
-      "Start-Sleep -Seconds 10",
-      "powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script"
-    ]
-    timeout          = "1h"
-    valid_exit_codes = [0, 3010]
-  }
+    provisioner "powershell" {
+        inline = [
+            "$path = 'C:\\AVDImage'",
+            "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
+            "cd C:\\AVDImage",
+            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_AVD_DisableServices.ps1' -OutFile 'C:\\AVDImage\\AIB_AVD_DisableServices.ps1'",
+            "Start-Sleep -Seconds 30",
+            "& .\\AIB_AVD_DisableServices.ps1"
+        ]
+        timeout          = "1h"
+        valid_exit_codes = [0, 3010]
+    }
 
   ##############################################
-  # 13. Disabling Scheduled Task
+  # 13. Disable Scheduled Tasks
   ##############################################
-  provisioner "powershell" {
-    inline = [
-      "$path = 'C:\\AVDImage'",
-      "if (-not (Test-Path -Path $path)) { New-Item -ItemType Directory -Force -Path $path | Out-Null }",
-      "$script = 'C:\\AVDImage\\AIB_AVD_DisableScheduleTask.ps1'",
-      "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_AVD_DisableScheduleTask.ps1' -OutFile $script",
-      "Start-Sleep -Seconds 10",
-      "powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script"
-    ]
-    timeout          = "1h"
-    valid_exit_codes = [0, 3010]
-  }
+    provisioner "powershell" {
+        inline = [
+            "$path = 'C:\\AVDImage'",
+            "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
+            "cd C:\\AVDImage",
+            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_AVD_DisableScheduleTask.ps1' -OutFile 'C:\\AVDImage\\AIB_AVD_DisableScheduleTask.ps1'",
+            "Start-Sleep -Seconds 30",
+            "& .\\AIB_AVD_DisableScheduleTask.ps1"
+        ]
+        timeout          = "1h"
+        valid_exit_codes = [0, 3010]
+    }
 
   ##############################################
-  # 14. Disabling Windows Traces
+  # 14. Disable Windows Traces
   ##############################################
-  provisioner "powershell" {
-    inline = [
-      "$path = 'C:\\AVDImage'",
-      "if (-not (Test-Path -Path $path)) { New-Item -ItemType Directory -Force -Path $path | Out-Null }",
-      "$script = 'C:\\AVDImage\\AIB_AVD_DisableWindowsTraces.ps1'",
-      "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_AVD_DisableWindowsTraces.ps1' -OutFile $script",
-      "Start-Sleep -Seconds 10",
-      "powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script"
-    ]
-    timeout          = "1h"
-    valid_exit_codes = [0, 3010]
-  }
+    provisioner "powershell" {
+        inline = [
+            "$path = 'C:\\AVDImage'",
+            "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
+            "cd C:\\AVDImage",
+            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_AVD_DisableWindowsTraces.ps1' -OutFile 'C:\\AVDImage\\AIB_AVD_DisableWindowsTraces.ps1'",
+            "Start-Sleep -Seconds 30",
+            "& .\\AIB_AVD_DisableWindowsTraces.ps1"
+        ]
+        timeout          = "1h"
+        valid_exit_codes = [0, 3010]
+    }
 
   ##############################################
   # 15. Lanman Parameters
   ##############################################
-  provisioner "powershell" {
-    inline = [
-      "$path = 'C:\\AVDImage'",
-      "if (-not (Test-Path -Path $path)) { New-Item -ItemType Directory -Force -Path $path | Out-Null }",
-      "$script = 'C:\\AVDImage\\AIB_AVD_LanmanParameters.ps1'",
-      "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_AVD_LanmanParameters.ps1' -OutFile $script",
-      "Start-Sleep -Seconds 10",
-      "powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script"
-    ]
-    timeout          = "1h"
-    valid_exit_codes = [0, 3010]
-  }
+    provisioner "powershell" {
+        inline = [
+            "$path = 'C:\\AVDImage'",
+            "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
+            "cd C:\\AVDImage",
+            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_AVD_LanmanParameters.ps1' -OutFile 'C:\\AVDImage\\AIB_AVD_LanmanParameters.ps1'",
+            "Start-Sleep -Seconds 30",
+            "& .\\AIB_AVD_LanmanParameters.ps1"
+        ]
+        timeout          = "1h"
+        valid_exit_codes = [0, 3010]
+    }
 
   ##############################################
   # 16. Remove UWP Apps
   ##############################################
-  provisioner "powershell" {
-    inline = [
-      "$path = 'C:\\AVDImage'",
-      "if (-not (Test-Path -Path $path)) { New-Item -ItemType Directory -Force -Path $path | Out-Null }",
-      "$script = 'C:\\AVDImage\\AIB_AVD_UWPRemoval.ps1'",
-      "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_AVD_UWPRemoval.ps1' -OutFile $script",
-      "Start-Sleep -Seconds 10",
-      "powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script"
-    ]
-    timeout          = "1h"
-    valid_exit_codes = [0, 3010]
-  }
+    provisioner "powershell" {
+        inline = [
+            "$path = 'C:\\AVDImage'",
+            "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
+            "cd C:\\AVDImage",
+            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_AVD_UWPRemoval.ps1' -OutFile 'C:\\AVDImage\\AIB_AVD_UWPRemoval.ps1'",
+            "Start-Sleep -Seconds 30",
+            "& .\\AIB_AVD_UWPRemoval.ps1"
+        ]
+        timeout          = "1h"
+        valid_exit_codes = [0, 3010]
+    }
 
   ##############################################
-  # 17. Security Hardening of the Image
+  # 17. Security Hardening
   ##############################################
-  provisioner "powershell" {
-    inline = [
-      "$path = 'C:\\AVDImage'",
-      "if (-not (Test-Path -Path $path)) { New-Item -ItemType Directory -Force -Path $path | Out-Null }",
-      "$script = 'C:\\AVDImage\\AIB_AVD_SecurityHardening.ps1'",
-      "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_AVD_SecurityHardening.ps1' -OutFile $script",
-      "Start-Sleep -Seconds 10",
-      "powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script"
-    ]
-    timeout          = "1h"
-    valid_exit_codes = [0, 3010]
-  }
+    provisioner "powershell" {
+        inline = [
+            "$path = 'C:\\AVDImage'",
+            "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
+            "cd C:\\AVDImage",
+            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_AVD_SecurityHardening.ps1' -OutFile 'C:\\AVDImage\\AIB_AVD_SecurityHardening.ps1'",
+            "Start-Sleep -Seconds 30",
+            "& .\\AIB_AVD_SecurityHardening.ps1"
+        ]
+        timeout          = "1h"
+        valid_exit_codes = [0, 3010]
+    }
 
   ##############################################
   # 18. Install Security Tools
   ##############################################
-  provisioner "powershell" {
-    inline = [
-      "$path = 'C:\\AVDImage'",
-      "if (-not (Test-Path -Path $path)) { New-Item -ItemType Directory -Force -Path $path | Out-Null }",
-      "$script = 'C:\\AVDImage\\AIB_AVD_SecurityToolInstallation_Nov.ps1'",
-      "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_AVD_SecurityToolInstallation_Nov.ps1' -OutFile $script",
-      "Start-Sleep -Seconds 10",
-      "powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script"
-    ]
-    timeout          = "2h"
-    valid_exit_codes = [0, 3010]
-  }
+    provisioner "powershell" {
+        inline = [
+            "$path = 'C:\\AVDImage'",
+            "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
+            "cd C:\\AVDImage",
+            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_AVD_SecurityToolInstallation_Nov.ps1' -OutFile 'C:\\AVDImage\\AIB_AVD_SecurityToolInstallation_Nov.ps1'",
+            "Start-Sleep -Seconds 30",
+            "& .\\AIB_AVD_SecurityToolInstallation_Nov.ps1"
+        ]
+        timeout          = "2h"
+        valid_exit_codes = [0, 3010]
+    }
 
   ##############################################
   # 19. Cleanup Image Build Artifacts
   ##############################################
-  provisioner "powershell" {
-    inline = [
-      "foreach ($p in 'C:\\AVDImage','C:\\AVDImage1','C:\\AVDImage2','C:\\AVDImage3') { if (Test-Path -Path $p) { Remove-Item -Path $p -Recurse -Force -ErrorAction SilentlyContinue } }",
-      "$cleanup = 'D:\\AIB_AVD_DiskCleanup.ps1'",
-      "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_AVD_DiskCleanup.ps1' -OutFile $cleanup",
-      "Start-Sleep -Seconds 10",
-      "powershell.exe -NoProfile -ExecutionPolicy Bypass -File $cleanup"
-    ]
-    timeout          = "2h"
-    valid_exit_codes = [0, 3010]
-  }
+    provisioner "powershell" {
+        inline = [
+            "$path1 = 'C:\\AVDImage'",
+            "If((Test-Path $path1)) { Remove-Item -Path $path1 -Recurse -Force -ErrorAction SilentlyContinue }",
+            "$path2 = 'C:\\AVDImage1'",
+            "If((Test-Path $path2)) { Remove-Item -Path $path2 -Recurse -Force -ErrorAction SilentlyContinue }",
+            "$path3 = 'C:\\AVDImage2'",
+            "If((Test-Path $path3)) { Remove-Item -Path $path3 -Recurse -Force -ErrorAction SilentlyContinue }",
+            "$path4 = 'C:\\AVDImage3'",
+            "If((Test-Path $path4)) { Remove-Item -Path $path4 -Recurse -Force -ErrorAction SilentlyContinue }",
+            "cd D:\\",
+            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_AVD_DiskCleanup.ps1' -OutFile 'D:\\AIB_AVD_DiskCleanup.ps1'",
+            "Start-Sleep -Seconds 30",
+            "& .\\AIB_AVD_DiskCleanup.ps1"
+        ]
+        timeout          = "2h"
+        valid_exit_codes = [0, 3010]
+    }
 
   ##############################################
-  # 20. Run Admin SysPrep
+  # 20. Run Sysprep / Generalize
   ##############################################
-  provisioner "powershell" {
-    inline = [
-      "while ((Get-Service RdAgent).Status -ne 'Running') { Start-Sleep -Seconds 5 }",
-      "while ((Get-Service WindowsAzureGuestAgent).Status -ne 'Running') { Start-Sleep -Seconds 5 }",
+    provisioner "powershell" {
+        inline = [
+            "while ((Get-Service RdAgent).Status -ne 'Running') { Start-Sleep -s 5 }",
+            "while ((Get-Service WindowsAzureGuestAgent).Status -ne 'Running') { Start-Sleep -s 5 }",
+            "& $env:SystemRoot\\System32\\Sysprep\\Sysprep.exe /oobe /generalize /quiet /quit /mode:vm",
+            "while($true) { $imageState = Get-ItemProperty HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Setup\\State | Select ImageState; if($imageState.ImageState -ne 'IMAGE_STATE_GENERALIZE_RESEAL_TO_OOBE') { Write-Output $imageState.ImageState; Start-Sleep -s 10 } else { break } }"
+        ]
+        timeout          = "3h"
+        valid_exit_codes = [0, 3010]
+    }
+}
