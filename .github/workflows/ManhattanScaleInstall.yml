@@ -1,4 +1,4 @@
-name: Install Manhattan Scale Image
+name: Install Manhattan Scale Image & Provision Local Admin
 
 on:
   workflow_dispatch:
@@ -13,20 +13,22 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
     name: Build Azure Manhattan Scale Image via Packer
+    runs-on: ubuntu-latest
 
     env:
       AZURE_SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }}
-      AZURE_TENANT_ID: ${{ secrets.TENANT_ID }}
-      AZURE_CLIENT_ID: ${{ secrets.CLIENT_ID }}
-      AZURE_CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
-      PACKER_LOG: 1
-      PACKER_LOG_PATH: ./packerlog.txt
+      AZURE_TENANT_ID:       ${{ secrets.TENANT_ID }}
+      AZURE_CLIENT_ID:       ${{ secrets.CLIENT_ID }}
+      AZURE_CLIENT_SECRET:   ${{ secrets.CLIENT_SECRET }}
+      PACKER_LOG:            1
+      PACKER_LOG_PATH:       ./packerlog.txt
+
+      # Packer variables (PKR_VAR_* automatically map to template variables)
       PKR_VAR_subscription_id: ${{ secrets.SUBSCRIPTION_ID }}
-      PKR_VAR_tenant_id: ${{ secrets.TENANT_ID }}
-      PKR_VAR_client_id: ${{ secrets.CLIENT_ID }}
-      PKR_VAR_client_secret: ${{ secrets.CLIENT_SECRET }}
+      PKR_VAR_tenant_id:       ${{ secrets.TENANT_ID }}
+      PKR_VAR_client_id:       ${{ secrets.CLIENT_ID }}
+      PKR_VAR_client_secret:   ${{ secrets.CLIENT_SECRET }}
 
     steps:
       - name: Checkout repository
@@ -56,3 +58,26 @@ jobs:
         with:
           name: packer-logs
           path: ./packerlog.txt
+
+  create-user:
+    name: Create ILSSRV Local Admin
+    runs-on: windows-latest
+    # Only run this job when triggered manually
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    # If you want this to run only after a successful image build when manually triggered, uncomment the next line:
+    # needs: [build]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Convert GitHub Secret to SecureString
+        shell: pwsh
+        run: |
+          $secure = ConvertTo-SecureString "${{ secrets.ILSSRV_PASSWORD }}" -AsPlainText -Force
+          Set-Variable -Name UserPassword -Value $secure -Scope Global
+
+      - name: Run account creation script
+        shell: pwsh
+        run: |
+          ./local-user.ps1 -ILSSRVPassword $UserPassword
