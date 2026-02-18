@@ -1,0 +1,58 @@
+name: Install Manhattan Scale Image
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '*.pkr.hcl'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build Azure Manhattan Scale Image via Packer
+
+    env:
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }}
+      AZURE_TENANT_ID: ${{ secrets.TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+      PACKER_LOG: 1
+      PACKER_LOG_PATH: ./packerlog.txt
+      PKR_VAR_subscription_id: ${{ secrets.SUBSCRIPTION_ID }}
+      PKR_VAR_tenant_id: ${{ secrets.TENANT_ID }}
+      PKR_VAR_client_id: ${{ secrets.CLIENT_ID }}
+      PKR_VAR_client_secret: ${{ secrets.CLIENT_SECRET }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Packer
+        uses: hashicorp/setup-packer@v2
+        with:
+          version: '1.9.4'
+
+      - name: Format Packer
+        run: packer fmt avd_windowsserver2022_prod_image_build.pkr.hcl
+
+      - name: Initialize Packer
+        run: packer init avd_windowsserver2022_prod_image_build.pkr.hcl
+        
+      - name: Validate Template
+        run: packer validate avd_windowsserver2022_prod_image_build.pkr.hcl
+
+      - name: Build Manhattan Scale Image
+        timeout-minutes: 1440
+        run: packer build -on-error=abort avd_windowsserver2022_prod_image_build.pkr.hcl
+        
+      - name: Upload Packer Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: packer-logs
+          path: ./packerlog.txt
