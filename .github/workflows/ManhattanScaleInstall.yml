@@ -24,7 +24,7 @@ jobs:
       PACKER_LOG:            1
       PACKER_LOG_PATH:       ./packerlog.txt
 
-      # Packer variables (PKR_VAR_* automatically map to template variables)
+      # Packer variables (PKR_VAR_* get passed into your Packer template)
       PKR_VAR_subscription_id: ${{ secrets.SUBSCRIPTION_ID }}
       PKR_VAR_tenant_id:       ${{ secrets.TENANT_ID }}
       PKR_VAR_client_id:       ${{ secrets.CLIENT_ID }}
@@ -62,10 +62,7 @@ jobs:
   create-user:
     name: Create ILSSRV Local Admin
     runs-on: windows-latest
-    # Only run this job when triggered manually
-    if: ${{ github.event_name == 'workflow_dispatch' }}
-    # If you want this to run only after a successful image build when manually triggered, uncomment the next line:
-    # needs: [build]
+    needs: [build]   # <<--- ensures SERIAL execution; this job starts AFTER 'build' succeeds
 
     steps:
       - name: Check out repository
