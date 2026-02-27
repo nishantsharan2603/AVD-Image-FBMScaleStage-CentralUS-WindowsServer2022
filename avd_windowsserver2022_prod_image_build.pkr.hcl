@@ -208,6 +208,13 @@ build {
     }
 
   ##############################################
+  # 5. Reboot after DSC
+  ##############################################
+    provisioner "windows-restart" {
+        restart_timeout = "20m"
+    }
+  
+  ##############################################
   # 9. Import NCache DLL and verify caches
   # Runs as SYSTEM
   ##############################################
