@@ -1,4 +1,4 @@
-name: Install Manhattan Scale Image & Provision Local Admin
+name: Build Manhattan Scale AVD Image
 
 on:
   workflow_dispatch:
@@ -7,6 +7,8 @@ on:
       - main
     paths:
       - '*.pkr.hcl'
+      - 'scripts/**'
+      - '.github/workflows/**'
 
 permissions:
   contents: read
@@ -15,66 +17,47 @@ jobs:
   build:
     name: Build Azure Manhattan Scale Image via Packer
     runs-on: ubuntu-latest
-
     env:
       AZURE_SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }}
       AZURE_TENANT_ID:       ${{ secrets.TENANT_ID }}
       AZURE_CLIENT_ID:       ${{ secrets.CLIENT_ID }}
       AZURE_CLIENT_SECRET:   ${{ secrets.CLIENT_SECRET }}
-      PACKER_LOG:            1
-      PACKER_LOG_PATH:       ./packerlog.txt
 
-      # Packer variables (PKR_VAR_* get passed into your Packer template)
-      PKR_VAR_subscription_id: ${{ secrets.SUBSCRIPTION_ID }}
-      PKR_VAR_tenant_id:       ${{ secrets.TENANT_ID }}
-      PKR_VAR_client_id:       ${{ secrets.CLIENT_ID }}
-      PKR_VAR_client_secret:   ${{ secrets.CLIENT_SECRET }}
+      # PKR_VAR_* automatically maps to Packer variable of the same name
+      # No sensitive value appears anywhere in this file
+      PKR_VAR_subscription_id:     ${{ secrets.SUBSCRIPTION_ID }}
+      PKR_VAR_tenant_id:           ${{ secrets.TENANT_ID }}
+      PKR_VAR_client_id:           ${{ secrets.CLIENT_ID }}
+      PKR_VAR_client_secret:       ${{ secrets.CLIENT_SECRET }}
+      PKR_VAR_ilssrv_password:     ${{ secrets.ILSSRV_PASSWORD }}
+      PKR_VAR_db_baseline_connstr: ${{ secrets.DB_BASELINE_CONNSTR }}
+      PKR_VAR_db_scalesys_connstr: ${{ secrets.DB_SCALESYS_CONNSTR }}
+
+      PACKER_LOG:      1
+      PACKER_LOG_PATH: ./packerlog.txt
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Packer
-        uses: hashicorp/setup-packer@v2
+        uses: hashicorp/setup-packer@v3
         with:
-          version: '1.9.4'
+          version: '1.11.0'
 
-      - name: Format Packer
-        run: packer fmt avd_windowsserver2022_prod_image_build.pkr.hcl
-
-      - name: Initialize Packer
+      - name: Packer Init
         run: packer init avd_windowsserver2022_prod_image_build.pkr.hcl
-        
-      - name: Validate Template
+
+      - name: Packer Validate
         run: packer validate avd_windowsserver2022_prod_image_build.pkr.hcl
 
-      - name: Build Manhattan Scale Image
+      - name: Build Image
         timeout-minutes: 1440
         run: packer build -on-error=abort avd_windowsserver2022_prod_image_build.pkr.hcl
-        
+
       - name: Upload Packer Logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: packer-logs
           path: ./packerlog.txt
-
-  create-user:
-    name: Create ILSSRV Local Admin
-    runs-on: windows-latest
-    needs: [build]   # <<--- ensures SERIAL execution; this job starts AFTER 'build' succeeds
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Convert GitHub Secret to SecureString
-        shell: pwsh
-        run: |
-          $secure = ConvertTo-SecureString "${{ secrets.ILSSRV_PASSWORD }}" -AsPlainText -Force
-          Set-Variable -Name UserPassword -Value $secure -Scope Global
-
-      - name: Run account creation script
-        shell: pwsh
-        run: |
-          ./local-user.ps1 -ILSSRVPassword $UserPassword
