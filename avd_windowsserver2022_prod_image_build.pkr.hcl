@@ -14,9 +14,8 @@ packer {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Variables
-# All values come from GitHub secrets via PKR_VAR_* environment variables.
-# Nothing sensitive is hardcoded here.
+# Variables - values injected via PKR_VAR_* from GitHub Actions secrets
+# Nothing sensitive is hardcoded here
 # ─────────────────────────────────────────────────────────────────────────────
 variable "subscription_id"     {}
 variable "tenant_id"           {}
@@ -68,6 +67,9 @@ build {
 
   ##############################################
   # 1. Apply Custom AVD Settings
+  # Runs as SYSTEM (packer account)
+  # Sets RDS timeouts, IE ESC, firewall rules,
+  # downloads and extracts Scale2024.zip
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -84,8 +86,9 @@ build {
 
   ##############################################
   # 2. Create ILSSRV Local User
-  # ILSSRV_PASSWORD flows: GitHub secret → PKR_VAR_ilssrv_password
-  # → Packer variable → environment_vars → $Env:ILSSRV_PASSWORD in script
+  # Runs as SYSTEM (packer account)
+  # Creates user, adds to Administrators,
+  # grants Log on as a service
   ##############################################
     provisioner "powershell" {
         environment_vars = [
@@ -105,6 +108,7 @@ build {
 
   ##############################################
   # 3. Install Scale Applications - AIM
+  # Runs as SYSTEM
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -120,45 +124,36 @@ build {
     }
 
   ##############################################
-  # 4. Download RunAsLocalUser wrapper
-  # Downloaded once here, reused by steps 5, 8, 10
+  # 4. Run dsc.ps1 as ILSSRV
+  # elevated_user = ILSSRV tells Packer to run
+  # this provisioner under ILSSRV's credentials
+  # No wrapper script needed
   ##############################################
     provisioner "powershell" {
+        elevated_user     = "ILSSRV"
+        elevated_password = var.ilssrv_password
         inline = [
             "$path = 'C:\\AVDImage'",
             "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
             "cd C:\\AVDImage",
-            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_RunAsLocalUser.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_RunAsLocalUser.ps1'",
-            "Start-Sleep -Seconds 10"
-        ]
-        timeout          = "10m"
-        valid_exit_codes = [0]
-    }
-
-  ##############################################
-  # 5. Run dsc.ps1 as ILSSRV via Scheduled Task
-  ##############################################
-    provisioner "powershell" {
-        environment_vars = [
-            "ILSSRV_PASSWORD=${var.ilssrv_password}"
-        ]
-        inline = [
-            "cd C:\\AVDImage",
-            "& .\\AIB_WindowsServer_2022_ManhattanScale_RunAsLocalUser.ps1 -ScriptName 'AIB_WindowsServer_2022_ManhattanScale_DSC.ps1'"
+            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_DSC.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_DSC.ps1'",
+            "Start-Sleep -Seconds 30",
+            "& .\\AIB_WindowsServer_2022_ManhattanScale_DSC.ps1"
         ]
         timeout          = "2h"
-        valid_exit_codes = [0]
+        valid_exit_codes = [0, 3010]
     }
 
   ##############################################
-  # 6. Reboot after DSC
+  # 5. Reboot after DSC
   ##############################################
     provisioner "windows-restart" {
         restart_timeout = "20m"
     }
 
   ##############################################
-  # 7. Check if Local User ILSSRV Exists in Admin Group
+  # 6. Post-Reboot: Verify ILSSRV still in Administrators
+  # Runs as SYSTEM
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -174,7 +169,8 @@ build {
     }
 
   ##############################################
-  # 8. Patch NCache config with app server IPs
+  # 7. Patch NCache config with app server IPs
+  # Runs as SYSTEM
   ##############################################
     provisioner "powershell" {
         environment_vars = [
@@ -193,22 +189,27 @@ build {
     }
 
   ##############################################
-  # 9. Install NCache as ILSSRV via Scheduled Task
+  # 8. Install and Start NCache as ILSSRV
+  # elevated_user = ILSSRV
   ##############################################
     provisioner "powershell" {
-        environment_vars = [
-            "ILSSRV_PASSWORD=${var.ilssrv_password}"
-        ]
+        elevated_user     = "ILSSRV"
+        elevated_password = var.ilssrv_password
         inline = [
+            "$path = 'C:\\AVDImage'",
+            "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
             "cd C:\\AVDImage",
-            "& .\\AIB_WindowsServer_2022_ManhattanScale_RunAsLocalUser.ps1 -ScriptName 'AIB_WindowsServer_2022_ManhattanScale_NCacheInstall.ps1'"
+            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_NCacheInstall.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_NCacheInstall.ps1'",
+            "Start-Sleep -Seconds 30",
+            "& .\\AIB_WindowsServer_2022_ManhattanScale_NCacheInstall.ps1"
         ]
         timeout          = "1h"
         valid_exit_codes = [0]
     }
 
   ##############################################
-  # 10. Import NCache Module and Start Cache
+  # 9. Import NCache DLL and verify caches
+  # Runs as SYSTEM
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -224,26 +225,32 @@ build {
     }
 
   ##############################################
-  # 11. Install Manhattan SCALE as ILSSRV via Scheduled Task
-  # DB connection strings flow: GitHub secrets → PKR_VAR_* → Packer variables
-  # → environment_vars → $Env:DB_*_CONNSTR in script
+  # 10. Install Manhattan SCALE as ILSSRV
+  # elevated_user = ILSSRV
+  # DB connection strings injected via environment_vars
   ##############################################
     provisioner "powershell" {
-        environment_vars = [
-            "ILSSRV_PASSWORD=${var.ilssrv_password}",
+        elevated_user     = "ILSSRV"
+        elevated_password = var.ilssrv_password
+        environment_vars  = [
             "DB_BASELINE_CONNSTR=${var.db_baseline_connstr}",
             "DB_SCALESYS_CONNSTR=${var.db_scalesys_connstr}"
         ]
         inline = [
+            "$path = 'C:\\AVDImage'",
+            "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
             "cd C:\\AVDImage",
-            "& .\\AIB_WindowsServer_2022_ManhattanScale_RunAsLocalUser.ps1 -ScriptName 'AIB_WindowsServer_2022_ManhattanScale_InstallScale.ps1'"
+            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_InstallScale.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_InstallScale.ps1'",
+            "Start-Sleep -Seconds 30",
+            "& .\\AIB_WindowsServer_2022_ManhattanScale_InstallScale.ps1"
         ]
         timeout          = "2h"
         valid_exit_codes = [0]
     }
 
   ##############################################
-  # 12. Re-verify ILSSRV group after Scale install
+  # 11. Re-verify ILSSRV group after Scale install
+  # Runs as SYSTEM
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -255,7 +262,8 @@ build {
     }
 
   ##############################################
-  # 13. Windows Optimization
+  # 12. Windows Optimization
+  # Runs as SYSTEM
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -271,7 +279,7 @@ build {
     }
 
   ##############################################
-  # 14. Post-Optimization Windows Updates
+  # 13. Post-Optimization Windows Updates
   ##############################################
     provisioner "windows-update" {
         search_criteria = "IsInstalled=0"
@@ -283,14 +291,14 @@ build {
     }
 
   ##############################################
-  # 15. Reboot After Updates
+  # 14. Reboot After Updates
   ##############################################
     provisioner "windows-restart" {
         restart_timeout = "20m"
     }
 
   ##############################################
-  # 16. Disable Unwanted Services
+  # 15. Disable Unwanted Services
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -306,7 +314,7 @@ build {
     }
 
   ##############################################
-  # 17. Disable Scheduled Tasks
+  # 16. Disable Scheduled Tasks
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -322,7 +330,7 @@ build {
     }
 
   ##############################################
-  # 18. Disable Windows Traces
+  # 17. Disable Windows Traces
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -338,7 +346,7 @@ build {
     }
 
   ##############################################
-  # 19. Lanman Parameters
+  # 18. Lanman Parameters
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -354,7 +362,7 @@ build {
     }
 
   ##############################################
-  # 20. Remove UWP Apps
+  # 19. Remove UWP Apps
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -370,7 +378,7 @@ build {
     }
 
   ##############################################
-  # 21. Security Hardening
+  # 20. Security Hardening
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -386,7 +394,7 @@ build {
     }
 
   ##############################################
-  # 22. Install Security Tools
+  # 21. Install Security Tools
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -402,7 +410,7 @@ build {
     }
 
   ##############################################
-  # 23. Cleanup Image Build Artifacts
+  # 22. Cleanup Image Build Artifacts
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -424,7 +432,7 @@ build {
     }
 
   ##############################################
-  # 24. Run Sysprep / Generalize
+  # 23. Sysprep / Generalize
   ##############################################
     provisioner "powershell" {
         inline = [
