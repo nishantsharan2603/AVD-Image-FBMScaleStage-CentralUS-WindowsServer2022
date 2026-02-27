@@ -50,7 +50,7 @@ source "azure-arm" "windowsserver2022_avd_manhattanscale" {
         resource_group      = "fbm-scale-americas-avd"
         gallery_name        = "acgazeasavdfbmscaleprod01"
         image_name          = "azure_windowsserver_2022_baseos_avd_24h2_prodeastus_gen2"
-        image_version       = "28.02.2026"
+        image_version       = "30.02.2026"
         replication_regions = ["eastus", "centralus"]
     }
 
@@ -209,6 +209,13 @@ build {
         timeout          = "1h"
         valid_exit_codes = [0]
     }
+	
+  ##############################################
+  # 5. Reboot after DSC
+  ##############################################
+    provisioner "windows-restart" {
+        restart_timeout = "20m"
+    }
 
   ##############################################
   # 9. Import NCache DLL and verify caches
@@ -236,6 +243,7 @@ build {
         elevated_user     = "ILSSRV"
         elevated_password = var.ilssrv_password
         environment_vars  = [
+            "ILSSRV_PASSWORD=${var.ilssrv_password}",
             "DB_BASELINE_CONNSTR=${var.db_baseline_connstr}",
             "DB_SCALESYS_CONNSTR=${var.db_scalesys_connstr}"
         ]
