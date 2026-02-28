@@ -50,7 +50,7 @@ source "azure-arm" "windowsserver2022_avd_manhattanscale" {
         resource_group      = "fbm-scale-americas-avd"
         gallery_name        = "acgazeasavdfbmscaleprod01"
         image_name          = "azure_windowsserver_2022_baseos_avd_24h2_prodeastus_gen2"
-        image_version       = "32.02.2026"
+        image_version       = "16.02.2026"
         replication_regions = ["eastus", "centralus"]
     }
 
@@ -169,71 +169,32 @@ build {
     }
 
   ##############################################
-  # 7. Patch NCache config with app server IPs
-  # Runs as SYSTEM
+  # 7. NCache Full Setup - runs as SYSTEM
+  # Patches client.ncconf + config.ncconf with IPs
+  # GAC cleanup, registers service, install.ps1,
+  # starts service, imports module, startcache.ps1,
+  # verifies ports 8700/9800
   ##############################################
     provisioner "powershell" {
         environment_vars = [
-            "NCACHE_SERVER_IPS=${var.ncache_server_ips}"
-        ]
-        inline = [
-            "$path = 'C:\\AVDImage'",
-            "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
-            "cd C:\\AVDImage",
-            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_NCacheConfig.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_NCacheConfig.ps1'",
-            "Start-Sleep -Seconds 30",
-            "& .\\AIB_WindowsServer_2022_ManhattanScale_NCacheConfig.ps1"
-        ]
-        timeout          = "30m"
-        valid_exit_codes = [0]
-    }
-
-  ##############################################
-  # 8. Install and Start NCache as ILSSRV
-   # Runs as SYSTEM
-  ##############################################
-    provisioner "powershell" {
-		environment_vars  = [
+            "NCACHE_SERVER_IPS=${var.ncache_server_ips}",
             "ILSSRV_PASSWORD=${var.ilssrv_password}"
         ]
         inline = [
             "$path = 'C:\\AVDImage'",
             "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
             "cd C:\\AVDImage",
-            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_NCacheInstall.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_NCacheInstall.ps1'",
+            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_NCacheSetup.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_NCacheSetup.ps1'",
             "Start-Sleep -Seconds 30",
-            "& .\\AIB_WindowsServer_2022_ManhattanScale_NCacheInstall.ps1"
+            "& .\\AIB_WindowsServer_2022_ManhattanScale_NCacheSetup.ps1"
         ]
         timeout          = "1h"
         valid_exit_codes = [0]
     }
-	
-  ##############################################
-  # 5. Reboot after DSC
-  ##############################################
-    provisioner "windows-restart" {
-        restart_timeout = "20m"
-    }
 
   ##############################################
-  # 9. Import NCache DLL and verify caches
-  # Runs as SYSTEM
+  # 8. Re-verify ILSSRV group after NCache install
   ##############################################
-    provisioner "powershell" {
-        inline = [
-            "$path = 'C:\\AVDImage'",
-            "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
-            "cd C:\\AVDImage",
-            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_ImportNcacheDLL.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_ImportNcacheDLL.ps1'",
-            "Start-Sleep -Seconds 30",
-            "& .\\AIB_WindowsServer_2022_ManhattanScale_ImportNcacheDLL.ps1"
-        ]
-        timeout          = "30m"
-        valid_exit_codes = [0, 3010]
-    }
-
-  ##############################################
-  # 10. Install Manhattan SCALE as ILSSRV
   # elevated_user = ILSSRV
   # DB connection strings injected via environment_vars
   ##############################################
