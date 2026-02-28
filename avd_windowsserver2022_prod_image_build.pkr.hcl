@@ -190,12 +190,10 @@ build {
 
   ##############################################
   # 8. Install and Start NCache as ILSSRV
-  # elevated_user = ILSSRV
+   # Runs as SYSTEM
   ##############################################
     provisioner "powershell" {
-        elevated_user     = "ILSSRV"
-        elevated_password = var.ilssrv_password
-        environment_vars  = [
+		environment_vars  = [
             "ILSSRV_PASSWORD=${var.ilssrv_password}"
         ]
         inline = [
