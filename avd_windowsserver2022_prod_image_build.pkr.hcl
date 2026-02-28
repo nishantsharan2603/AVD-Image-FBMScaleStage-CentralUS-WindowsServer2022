@@ -50,7 +50,7 @@ source "azure-arm" "windowsserver2022_avd_manhattanscale" {
         resource_group      = "fbm-scale-americas-avd"
         gallery_name        = "acgazeasavdfbmscaleprod01"
         image_name          = "azure_windowsserver_2022_baseos_avd_24h2_prodeastus_gen2"
-        image_version       = "31.02.2026"
+        image_version       = "32.02.2026"
         replication_regions = ["eastus", "centralus"]
     }
 
