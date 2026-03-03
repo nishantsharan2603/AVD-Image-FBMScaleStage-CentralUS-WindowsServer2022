@@ -50,7 +50,7 @@ source "azure-arm" "windowsserver2022_avd_manhattanscale" {
         resource_group      = "fbm-scale-americas-avd"
         gallery_name        = "acgazeasavdfbmscaleprod01"
         image_name          = "azure_windowsserver_2022_baseos_avd_24h2_prodeastus_gen2"
-        image_version       = "37.02.2026"
+        image_version       = "38.02.2026"
         replication_regions = ["eastus", "centralus"]
     }
 
@@ -277,7 +277,7 @@ build {
             "cd C:\\AVDImage",
             "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_DisableServices.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_DisableServices.ps1'",
             "Start-Sleep -Seconds 30",
-            "& .\\AIB_AVD_DisableServices.ps1"
+            "& .\\AIB_WindowsServer_2022_ManhattanScale_DisableServices.ps1"
         ]
         timeout          = "1h"
         valid_exit_codes = [0, 3010]
@@ -293,7 +293,7 @@ build {
             "cd C:\\AVDImage",
             "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_DisableScheduleTask.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_DisableScheduleTask.ps1'",
             "Start-Sleep -Seconds 30",
-            "& .\\AIB_AVD_DisableScheduleTask.ps1"
+            "& .\\AIB_WindowsServer_2022_ManhattanScale_DisableScheduleTask.ps1"
         ]
         timeout          = "1h"
         valid_exit_codes = [0, 3010]
@@ -341,7 +341,7 @@ build {
             "cd C:\\AVDImage",
             "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_SecurityHardening.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_SecurityHardening.ps1'",
             "Start-Sleep -Seconds 30",
-            "& .\\AIB_AVD_SecurityHardening.ps1"
+            "& .\\AIB_WindowsServer_2022_ManhattanScale_SecurityHardening.ps1"
         ]
         timeout          = "1h"
         valid_exit_codes = [0, 3010]
