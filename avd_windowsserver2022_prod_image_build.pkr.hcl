@@ -219,7 +219,7 @@ build {
     }
 
   ##############################################
-  # 11. Re-verify ILSSRV group after Scale install
+  # 9. Re-verify ILSSRV group after Scale install
   # Runs as SYSTEM
   ##############################################
     provisioner "powershell" {
@@ -232,7 +232,7 @@ build {
     }
 
   ##############################################
-  # 12. Windows Optimization
+  # 10. Windows Optimization
   # Runs as SYSTEM
   ##############################################
     provisioner "powershell" {
@@ -249,7 +249,7 @@ build {
     }
 
   ##############################################
-  # 13. Post-Optimization Windows Updates
+  # 11. Post-Optimization Windows Updates
   ##############################################
     provisioner "windows-update" {
         search_criteria = "IsInstalled=0"
@@ -261,14 +261,14 @@ build {
     }
 
   ##############################################
-  # 14. Reboot After Updates
+  # 12. Reboot After Updates
   ##############################################
     provisioner "windows-restart" {
         restart_timeout = "20m"
     }
 
   ##############################################
-  # 15. Disable Unwanted Services
+  # 13. Disable Unwanted Services
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -284,7 +284,7 @@ build {
     }
 
   ##############################################
-  # 16. Disable Scheduled Tasks
+  # 14. Disable Scheduled Tasks
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -300,7 +300,7 @@ build {
     }
 
   ##############################################
-  # 17. Disable Windows Traces
+  # 15. Disable Windows Traces
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -316,7 +316,7 @@ build {
     }
 
   ##############################################
-  # 18. Lanman Parameters
+  # 16. Lanman Parameters
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -332,7 +332,7 @@ build {
     }
 
   ##############################################
-  # 20. Security Hardening
+  # 17. Security Hardening
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -348,7 +348,31 @@ build {
     }
 
   ##############################################
-  # 21. Install Security Tools
+  # 18. Reboot after Windows Optimization
+  ##############################################
+    provisioner "windows-restart" {
+        restart_timeout = "20m"
+    }
+
+  ##############################################
+  # 19. Post-Reboot: Verify ILSSRV still in Administrators
+  # Runs as SYSTEM
+  ##############################################
+    provisioner "powershell" {
+        inline = [
+            "$path = 'C:\\AVDImage'",
+            "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
+            "cd C:\\AVDImage",
+            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_LocalUserAdministratorVerify.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_LocalUserAdministratorVerify.ps1'",
+            "Start-Sleep -Seconds 30",
+            "& .\\AIB_WindowsServer_2022_ManhattanScale_LocalUserAdministratorVerify.ps1"
+        ]
+        timeout          = "15m"
+        valid_exit_codes = [0, 10]
+    }
+
+  ##############################################
+  # 20. Install Security Tools
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -364,7 +388,7 @@ build {
     }
 
   ##############################################
-  # 22. Cleanup Image Build Artifacts
+  # 21. Cleanup Image Build Artifacts
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -386,7 +410,7 @@ build {
     }
 
   ##############################################
-  # 23. Sysprep / Generalize
+  # 22. Sysprep / Generalize
   ##############################################
     provisioner "powershell" {
         inline = [
