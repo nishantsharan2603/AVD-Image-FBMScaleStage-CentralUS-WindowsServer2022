@@ -275,9 +275,9 @@ build {
             "$path = 'C:\\AVDImage'",
             "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
             "cd C:\\AVDImage",
-            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_DisableServices.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_DisableServices.ps1'",
+            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_AVD_DisableServices.ps1' -OutFile 'C:\\AVDImage\\AIB_AVD_DisableServices.ps1'",
             "Start-Sleep -Seconds 30",
-            "& .\\AIB_WindowsServer_2022_ManhattanScale_DisableServices.ps1"
+            "& .\\AIB_AVD_DisableServices.ps1"
         ]
         timeout          = "1h"
         valid_exit_codes = [0, 3010]
@@ -291,9 +291,9 @@ build {
             "$path = 'C:\\AVDImage'",
             "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
             "cd C:\\AVDImage",
-            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_DisableScheduleTask.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_DisableScheduleTask.ps1'",
+            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_AVD_DisableScheduleTask.ps1' -OutFile 'C:\\AVDImage\\AIB_AVD_DisableScheduleTask.ps1'",
             "Start-Sleep -Seconds 30",
-            "& .\\AIB_WindowsServer_2022_ManhattanScale_DisableScheduleTask.ps1"
+            "& .\\AIB_AVD_DisableScheduleTask.ps1"
         ]
         timeout          = "1h"
         valid_exit_codes = [0, 3010]
