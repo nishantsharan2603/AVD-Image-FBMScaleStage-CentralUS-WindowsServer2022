@@ -351,7 +351,7 @@ build {
   # 18. Reboot after Windows Optimization
   ##############################################
     provisioner "windows-restart" {
-        restart_timeout = "20m"
+        restart_timeout = "30m"
     }
 
   ##############################################
