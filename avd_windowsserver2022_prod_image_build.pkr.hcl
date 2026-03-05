@@ -192,11 +192,21 @@ build {
         valid_exit_codes = [0]
     }
 
-  ##############################################
-  # 8. Re-verify ILSSRV group after NCache install
-  ##############################################
-  # elevated_user = ILSSRV
-  # DB connection strings injected via environment_vars
+    ##############################################
+  # 8a. Install SCALE Base
+  # SPLIT from combined script to fix hang.
+  #
+  # WHY IT HUNG BEFORE:
+  # - Install.ps1 registers COM+ app pools and starts IIS/SCALE services
+  # - install_update.ps1 immediately tries COM+ identity check on the
+  #   same catalog — catalog is still locked by the previous registration
+  # - Combined session: WinRM elevated wrapper emits ONE exit signal for
+  #   the whole session; two heavy installers meant Packer often missed it
+  #
+  # FIX:
+  # - Base install runs here, explicitly stops IIS/SCALE before exit
+  # - Reboot (step 8b) fully flushes COM+ catalog + IIS worker processes
+  # - Security update (step 8c) runs in a fresh WinRM session post-reboot
   ##############################################
     provisioner "powershell" {
         elevated_user     = "ILSSRV"
@@ -210,12 +220,65 @@ build {
             "$path = 'C:\\AVDImage'",
             "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
             "cd C:\\AVDImage",
-            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_InstallScale.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_InstallScale.ps1'",
+            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_InstallScale_Base.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_InstallScale_Base.ps1'",
             "Start-Sleep -Seconds 30",
-            "& .\\AIB_WindowsServer_2022_ManhattanScale_InstallScale.ps1"
+            "& .\\AIB_WindowsServer_2022_ManhattanScale_InstallScale_Base.ps1"
         ]
         timeout          = "2h"
         valid_exit_codes = [0]
+    }
+
+  ##############################################
+  # 8b. Reboot after Base SCALE Install
+  # Flushes COM+ catalog locks, IIS worker
+  # processes, and SCALE service handles before
+  # security update runs in a clean session.
+  ##############################################
+    provisioner "windows-restart" {
+        restart_timeout = "20m"
+    }
+
+  ##############################################
+  # 8c. Apply SCALE Security Update 24.17.2810.0
+  # Runs in fresh WinRM session post-reboot.
+  #
+  # $PSScriptRoot fix: script is invoked via
+  # full absolute path with Push-Location to
+  # $updatePath so $PSScriptRoot resolves to
+  # the update package dir, not Packer's temp
+  # WinRM wrapper directory.
+  ##############################################
+    provisioner "powershell" {
+        elevated_user     = "ILSSRV"
+        elevated_password = var.ilssrv_password
+        environment_vars  = [
+            "ILSSRV_PASSWORD=${var.ilssrv_password}",
+            "DB_BASELINE_CONNSTR=${var.db_baseline_connstr}",
+            "DB_SCALESYS_CONNSTR=${var.db_scalesys_connstr}"
+        ]
+        inline = [
+            "$path = 'C:\\AVDImage'",
+            "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
+            "cd C:\\AVDImage",
+            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_InstallScale_SecurityUpdate.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_InstallScale_SecurityUpdate.ps1'",
+            "Start-Sleep -Seconds 30",
+            "& .\\AIB_WindowsServer_2022_ManhattanScale_InstallScale_SecurityUpdate.ps1"
+        ]
+        timeout          = "2h"
+        valid_exit_codes = [0]
+    }
+
+  ##############################################
+  # 9. Re-verify ILSSRV still in Administrators
+  # (unchanged - runs as SYSTEM same as before)
+  ##############################################
+    provisioner "powershell" {
+        inline = [
+            "cd C:\\AVDImage",
+            "& .\\AIB_WindowsServer_2022_ManhattanScale_LocalUserAdministratorVerify.ps1"
+        ]
+        timeout          = "15m"
+        valid_exit_codes = [0, 10]
     }
 
   ##############################################
