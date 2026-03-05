@@ -397,18 +397,18 @@ build {
   ##############################################
   # 17. Security Hardening
   ##############################################
-    provisioner "powershell" {
-        inline = [
-            "$path = 'C:\\AVDImage'",
-            "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
-            "cd C:\\AVDImage",
-            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_SecurityHardening.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_SecurityHardening.ps1'",
-            "Start-Sleep -Seconds 30",
-            "& .\\AIB_WindowsServer_2022_ManhattanScale_SecurityHardening.ps1"
-        ]
-        timeout          = "1h"
-        valid_exit_codes = [0, 3010]
-    }
+  #  provisioner "powershell" {
+  #      inline = [
+  #          "$path = 'C:\\AVDImage'",
+  #          "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
+  #          "cd C:\\AVDImage",
+  #          "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_SecurityHardening.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_SecurityHardening.ps1'",
+  #          "Start-Sleep -Seconds 30",
+  #         "& .\\AIB_WindowsServer_2022_ManhattanScale_SecurityHardening.ps1"
+  #      ]
+  #      timeout          = "1h"
+  #      valid_exit_codes = [0, 3010]
+  #  }
 
   ##############################################
   # 18. Reboot after Windows Optimization
