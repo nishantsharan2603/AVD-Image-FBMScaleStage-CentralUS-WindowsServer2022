@@ -50,7 +50,7 @@ source "azure-arm" "windowsserver2022_avd_manhattanscale" {
         resource_group      = "fbm-scale-americas-avd"
         gallery_name        = "acgazeasavdfbmscaleprod01"
         image_name          = "azure_windowsserver_2022_baseos_avd_24h2_prodeastus_gen2"
-        image_version       = "38.02.2026"
+        image_version       = "39.02.2026"
         replication_regions = ["eastus", "centralus"]
     }
 
@@ -107,7 +107,23 @@ build {
     }
 
   ##############################################
-  # 3. Install Scale Applications - AIM
+  # 3. Security Hardening
+  ##############################################
+    provisioner "powershell" {
+        inline = [
+            "$path = 'C:\\AVDImage'",
+            "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
+            "cd C:\\AVDImage",
+            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_SecurityHardening.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_SecurityHardening.ps1'",
+            "Start-Sleep -Seconds 30",
+           "& .\\AIB_WindowsServer_2022_ManhattanScale_SecurityHardening.ps1"
+        ]
+        timeout          = "1h"
+        valid_exit_codes = [0, 3010]
+    }
+
+  ##############################################
+  # 4. Install Scale Applications - AIM
   # Runs as SYSTEM
   ##############################################
     provisioner "powershell" {
@@ -124,7 +140,7 @@ build {
     }
 
   ##############################################
-  # 4. Run dsc.ps1 as ILSSRV
+  # 5. Run dsc.ps1 as ILSSRV
   # elevated_user = ILSSRV tells Packer to run
   # this provisioner under ILSSRV's credentials
   # No wrapper script needed
@@ -145,14 +161,14 @@ build {
     }
 
   ##############################################
-  # 5. Reboot after DSC
+  # 6. Reboot after DSC
   ##############################################
     provisioner "windows-restart" {
         restart_timeout = "20m"
     }
 
   ##############################################
-  # 6. Post-Reboot: Verify ILSSRV still in Administrators
+  # 7. Post-Reboot: Verify ILSSRV still in Administrators
   # Runs as SYSTEM
   ##############################################
     provisioner "powershell" {
@@ -169,7 +185,7 @@ build {
     }
 
   ##############################################
-  # 7. NCache Full Setup - runs as SYSTEM
+  # 8. NCache Full Setup - runs as SYSTEM
   # Patches client.ncconf + config.ncconf with IPs
   # GAC cleanup, registers service, install.ps1,
   # starts service, imports module, startcache.ps1,
@@ -193,7 +209,7 @@ build {
     }
 
     ##############################################
-  # 8a. Install SCALE Base
+  # 9a. Install SCALE Base
   # SPLIT from combined script to fix hang.
   #
   # WHY IT HUNG BEFORE:
@@ -229,7 +245,7 @@ build {
     }
 
   ##############################################
-  # 8b. Reboot after Base SCALE Install
+  # 9b. Reboot after Base SCALE Install
   # Flushes COM+ catalog locks, IIS worker
   # processes, and SCALE service handles before
   # security update runs in a clean session.
@@ -239,7 +255,7 @@ build {
     }
 
   ##############################################
-  # 8c. Apply SCALE Security Update 24.17.2810.0
+  # 9c. Apply SCALE Security Update 24.17.2810.0
   # Runs in fresh WinRM session post-reboot.
   #
   # $PSScriptRoot fix: script is invoked via
@@ -269,7 +285,7 @@ build {
     }
 
   ##############################################
-  # 9. Re-verify ILSSRV still in Administrators
+  # 10. Re-verify ILSSRV still in Administrators
   # (unchanged - runs as SYSTEM same as before)
   ##############################################
     provisioner "powershell" {
@@ -282,7 +298,7 @@ build {
     }
 
   ##############################################
-  # 9. Re-verify ILSSRV group after Scale install
+  # 11. Re-verify ILSSRV group after Scale install
   # Runs as SYSTEM
   ##############################################
     provisioner "powershell" {
@@ -295,7 +311,7 @@ build {
     }
 
   ##############################################
-  # 10. Windows Optimization
+  # 12. Windows Optimization
   # Runs as SYSTEM
   ##############################################
     provisioner "powershell" {
@@ -312,7 +328,7 @@ build {
     }
 
   ##############################################
-  # 11. Post-Optimization Windows Updates
+  # 13. Post-Optimization Windows Updates
   ##############################################
     provisioner "windows-update" {
         search_criteria = "IsInstalled=0"
@@ -324,14 +340,14 @@ build {
     }
 
   ##############################################
-  # 12. Reboot After Updates
+  # 14. Reboot After Updates
   ##############################################
     provisioner "windows-restart" {
         restart_timeout = "20m"
     }
 
   ##############################################
-  # 13. Disable Unwanted Services
+  # 15. Disable Unwanted Services
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -347,7 +363,7 @@ build {
     }
 
   ##############################################
-  # 14. Disable Scheduled Tasks
+  # 16. Disable Scheduled Tasks
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -363,7 +379,7 @@ build {
     }
 
   ##############################################
-  # 15. Disable Windows Traces
+  # 17. Disable Windows Traces
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -379,7 +395,7 @@ build {
     }
 
   ##############################################
-  # 16. Lanman Parameters
+  # 18. Lanman Parameters
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -395,30 +411,14 @@ build {
     }
 
   ##############################################
-  # 17. Security Hardening
-  ##############################################
-  #  provisioner "powershell" {
-  #      inline = [
-  #          "$path = 'C:\\AVDImage'",
-  #          "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
-  #          "cd C:\\AVDImage",
-  #          "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_SecurityHardening.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_SecurityHardening.ps1'",
-  #          "Start-Sleep -Seconds 30",
-  #         "& .\\AIB_WindowsServer_2022_ManhattanScale_SecurityHardening.ps1"
-  #      ]
-  #      timeout          = "1h"
-  #      valid_exit_codes = [0, 3010]
-  #  }
-
-  ##############################################
-  # 18. Reboot after Windows Optimization
+  # 19. Reboot after Windows Optimization
   ##############################################
     provisioner "windows-restart" {
         restart_timeout = "30m"
     }
 
   ##############################################
-  # 19. Post-Reboot: Verify ILSSRV still in Administrators
+  # 20. Post-Reboot: Verify ILSSRV still in Administrators
   # Runs as SYSTEM
   ##############################################
     provisioner "powershell" {
@@ -435,7 +435,7 @@ build {
     }
 
   ##############################################
-  # 20. Install Security Tools
+  # 21. Install Security Tools
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -451,7 +451,7 @@ build {
     }
 
   ##############################################
-  # 21. Cleanup Image Build Artifacts
+  # 22. Cleanup Image Build Artifacts
   ##############################################
     provisioner "powershell" {
         inline = [
@@ -473,7 +473,7 @@ build {
     }
 
   ##############################################
-  # 22. Sysprep / Generalize
+  # 23. Sysprep / Generalize
   ##############################################
     provisioner "powershell" {
         inline = [
