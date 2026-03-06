@@ -50,7 +50,7 @@ source "azure-arm" "windowsserver2022_avd_manhattanscale" {
         resource_group      = "fbm-scale-americas-avd"
         gallery_name        = "acgazeasavdfbmscaleprod01"
         image_name          = "azure_windowsserver_2022_baseos_avd_24h2_prodeastus_gen2"
-        image_version       = "40.02.2026"
+        image_version       = "41.02.2026"
         replication_regions = ["eastus", "centralus"]
     }
 
@@ -105,22 +105,25 @@ build {
         timeout          = "30m"
         valid_exit_codes = [0]
     }
-
-  ##############################################
-  # 3. Security Hardening
+ ##############################################
+  # 3. Security Hardening of the Image
   ##############################################
     provisioner "powershell" {
         inline = [
-            "$path = 'C:\\AVDImage'",
-            "If(!(Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path }",
-            "cd C:\\AVDImage",
-            "Invoke-WebRequest -Uri 'https://avdprodfbmscalestc01.blob.core.windows.net/sourcefbmscaleprod/AIB_WindowsServer_2022_ManhattanScale_SecurityHardening.ps1' -OutFile 'C:\\AVDImage\\AIB_WindowsServer_2022_ManhattanScale_SecurityHardening.ps1'",
-            "Start-Sleep -Seconds 30",
-           "& .\\AIB_WindowsServer_2022_ManhattanScale_SecurityHardening.ps1"
+        "$path = 'C:\\AVDImage'",
+        "If(!(Test-Path $path))",
+        "{",
+        "New-Item -ItemType Directory -Force -Path $path",
+        "}",
+        "cd C:\\AVDImage",
+        "Invoke-WebRequest -Uri 'https://avdweustc03.blob.core.windows.net/source/AIB_AVD_SecurityHardening_Win1124H2.ps1' -OutFile 'C:\\AVDImage\\AIB_AVD_SecurityHardening_Win1124H2.ps1'",
+        "Start-Sleep -seconds 30",
+        "& .\\AIB_AVD_SecurityHardening_Win1124H2.ps1"
         ]
         timeout          = "1h"
         valid_exit_codes = [0, 3010]
     }
+
   ##############################################
   # Reboot after DSC
   ##############################################
