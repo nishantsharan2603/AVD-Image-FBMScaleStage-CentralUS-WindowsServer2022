@@ -24,7 +24,7 @@ variable "client_secret"       { sensitive = true }
 variable "ilssrv_password"     { sensitive = true }
 variable "db_baseline_connstr" { sensitive = true }
 variable "db_scalesys_connstr" { sensitive = true }
-variable "ncache_server_ips"   { default   = "180.16.64.4,180.16.64.5" }
+variable "ncache_server_ips"   { default   = "0.0.0.0,1.1.1.1" }
 
 source "azure-arm" "windowsserver2022_avd_manhattanscale" {
     subscription_id = var.subscription_id
