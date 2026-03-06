@@ -50,7 +50,7 @@ source "azure-arm" "windowsserver2022_avd_manhattanscale" {
         resource_group      = "fbm-scale-americas-avd"
         gallery_name        = "acgazeasavdfbmscaleprod01"
         image_name          = "azure_windowsserver_2022_baseos_avd_24h2_prodeastus_gen2"
-        image_version       = "39.02.2026"
+        image_version       = "40.02.2026"
         replication_regions = ["eastus", "centralus"]
     }
 
@@ -120,6 +120,12 @@ build {
         ]
         timeout          = "1h"
         valid_exit_codes = [0, 3010]
+    }
+  ##############################################
+  # Reboot after DSC
+  ##############################################
+    provisioner "windows-restart" {
+        restart_timeout = "20m"
     }
 
   ##############################################
