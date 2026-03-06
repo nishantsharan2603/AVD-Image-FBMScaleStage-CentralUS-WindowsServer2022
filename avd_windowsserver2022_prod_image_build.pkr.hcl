@@ -105,25 +105,7 @@ build {
         timeout          = "30m"
         valid_exit_codes = [0]
     }
- ##############################################
-  # 3. Security Hardening of the Image
-  ##############################################
-    provisioner "powershell" {
-        inline = [
-        "$path = 'C:\\AVDImage'",
-        "If(!(Test-Path $path))",
-        "{",
-        "New-Item -ItemType Directory -Force -Path $path",
-        "}",
-        "cd C:\\AVDImage",
-        "Invoke-WebRequest -Uri 'https://avdweustc03.blob.core.windows.net/source/AIB_AVD_SecurityHardening_Win1124H2.ps1' -OutFile 'C:\\AVDImage\\AIB_AVD_SecurityHardening_Win1124H2.ps1'",
-        "Start-Sleep -seconds 30",
-        "& .\\AIB_AVD_SecurityHardening_Win1124H2.ps1"
-        ]
-        timeout          = "1h"
-        valid_exit_codes = [0, 3010]
-    }
-
+ 
   ##############################################
   # Reboot after DSC
   ##############################################
@@ -480,6 +462,25 @@ build {
         timeout          = "2h"
         valid_exit_codes = [0, 3010]
     }
+  ##############################################
+  # 3. Security Hardening of the Image
+  ##############################################
+    provisioner "powershell" {
+        inline = [
+        "$path = 'C:\\AVDImage'",
+        "If(!(Test-Path $path))",
+        "{",
+        "New-Item -ItemType Directory -Force -Path $path",
+        "}",
+        "cd C:\\AVDImage",
+        "Invoke-WebRequest -Uri 'https://avdweustc03.blob.core.windows.net/source/AIB_AVD_SecurityHardening_Win1124H2.ps1' -OutFile 'C:\\AVDImage\\AIB_AVD_SecurityHardening_Win1124H2.ps1'",
+        "Start-Sleep -seconds 30",
+        "& .\\AIB_AVD_SecurityHardening_Win1124H2.ps1"
+        ]
+        timeout          = "1h"
+        valid_exit_codes = [0, 3010]
+    }
+
 
   ##############################################
   # 23. Sysprep / Generalize
